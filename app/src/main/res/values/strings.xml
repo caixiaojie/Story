@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">Story</string>
+    <string name="login_failure">登录失败</string>
+    <string name="network_isnot_available">网络无连接</string>
+    <string name="User_name_cannot_be_empty">用户名不能为空</string>
+    <string name="Password_cannot_be_empty">密码不能为空</string>
+    <string name="is_landing">logining..</string>
+    <string name="Login_failed">Login failed..</string>
+    <string name="Nick_name_cannot_be_empty">昵称不能为空</string>
+    <string name="is_registing">注册中..</string>
 </resources>

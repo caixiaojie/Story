@@ -1,6 +1,8 @@
 package com.junyao.cxj.story.activity;
 
+import android.app.ProgressDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Bitmap;
@@ -13,6 +15,7 @@ import android.provider.MediaStore;
 import android.support.v7.app.ActionBar;
 import android.text.TextUtils;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -29,10 +32,18 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 
+import com.google.gson.Gson;
 import com.junyao.cxj.story.R;
 import com.junyao.cxj.story.application.MyApplication;
+import com.junyao.cxj.story.bean.RegistBean;
+import com.junyao.cxj.story.constant.StoyInter;
+import com.junyao.cxj.story.util.CommonUtils;
+import com.zhy.http.okhttp.OkHttpUtils;
+import com.zhy.http.okhttp.callback.StringCallback;
 
 import java.io.File;
+
+import okhttp3.Call;
 
 public class RegistActivity extends BaseActivity {
 
@@ -49,6 +60,7 @@ public class RegistActivity extends BaseActivity {
     private Button btn_cancel;
     private String head_url;
     private File file;
+    private boolean progressShow;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -76,7 +88,7 @@ public class RegistActivity extends BaseActivity {
                 }
             }
         });
-        nikename.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+        /*nikename.setOnFocusChangeListener(new View.OnFocusChangeListener() {
             @Override
             public void onFocusChange(View view, boolean b) {
                 if (!b) {
@@ -95,7 +107,7 @@ public class RegistActivity extends BaseActivity {
                     }
                 }
             }
-        });
+        });*/
         //监测虚拟键盘登录
         password.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override
@@ -271,10 +283,70 @@ public class RegistActivity extends BaseActivity {
      * 注册网络请求
      */
     public void getData() {
-        String username = this.account.getText().toString();
-        String nikename = this.nikename.getText().toString();
-        String password = this.password.getText().toString();
-        //HttpUtils.getRegistData(nikename, username, password, file,this);
+        if (!CommonUtils.isNetWorkConnected(this)) {
+            Toast.makeText(this,R.string.network_isnot_available,Toast.LENGTH_SHORT).show();
+        }
+        String nickname = nikename.getText().toString();
+        String username = account.getText().toString();
+        String pwd = password.getText().toString();
+        if (TextUtils.isEmpty(username)) {
+            Toast.makeText(this,R.string.User_name_cannot_be_empty,Toast.LENGTH_SHORT).show();
+        }
+        if (TextUtils.isEmpty(nickname)) {
+            Toast.makeText(this,R.string.Nick_name_cannot_be_empty,Toast.LENGTH_SHORT).show();
+        }
+        if (TextUtils.isEmpty(pwd)) {
+            Toast.makeText(this,R.string.Password_cannot_be_empty,Toast.LENGTH_SHORT).show();
+        }
+        progressShow = true;
+        final ProgressDialog pd = new ProgressDialog(RegistActivity.this);
+        pd.setCanceledOnTouchOutside(false);
+        pd.setOnCancelListener(new DialogInterface.OnCancelListener() {
+            @Override
+            public void onCancel(DialogInterface dialog) {
+                progressShow = false;
+            }
+        });
+        pd.setMessage(getString(R.string.is_registing));
+        pd.show();
+        OkHttpUtils.post()
+                .url(StoyInter.REGIST)
+                .addParams("nikename",nickname)
+                .addParams("username",username)
+                .addParams("password",pwd)
+                .addFile("file",head_url,file)
+                .build()
+                .execute(new StringCallback() {
+                    @Override
+                    public void onError(Call call, Exception e, int id) {
+                        if (!progressShow) {
+                            return;
+                        }
+                        runOnUiThread(new Runnable() {
+                            public void run() {
+                                pd.dismiss();
+                                Toast.makeText(getApplicationContext(), getString(R.string.Login_failed),
+                                        Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onResponse(String response, int id) {
+                        if (response != null) {
+                            Log.e("info",response);
+                            RegistBean bean = new Gson().fromJson(response, RegistBean.class);
+                            if (bean.getResult() == 1) {
+                                if (!RegistActivity.this.isFinishing() && pd.isShowing())
+                                {
+                                    pd.dismiss();
+                                }
+                                Toast.makeText(MyApplication.getContext(),bean.getMsg(),Toast.LENGTH_SHORT).show();
+                                finish();
+                            }
+                        }
+                    }
+                });
     }
 
 }

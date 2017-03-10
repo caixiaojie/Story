@@ -1,6 +1,8 @@
 package com.junyao.cxj.story.activity;
 
+import android.app.ProgressDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
@@ -17,7 +19,18 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.gson.Gson;
 import com.junyao.cxj.story.R;
+import com.junyao.cxj.story.application.MyApplication;
+import com.junyao.cxj.story.bean.LoginBean;
+import com.junyao.cxj.story.constant.StoyInter;
+import com.junyao.cxj.story.util.CommonUtils;
+import com.zhy.http.okhttp.OkHttpUtils;
+import com.zhy.http.okhttp.callback.Callback;
+import com.zhy.http.okhttp.callback.StringCallback;
+
+import okhttp3.Call;
+import okhttp3.Response;
 
 
 public class LoginActivity extends BaseActivity {
@@ -43,6 +56,7 @@ public class LoginActivity extends BaseActivity {
             }
         }
     };
+    private boolean progressShow;
 
     @Override
     protected void onResume() {
@@ -67,7 +81,7 @@ public class LoginActivity extends BaseActivity {
      * 初始化监听
      */
     private void initListener() {
-        //获取焦点监听
+        /*//获取焦点监听
         et_username.setOnFocusChangeListener(new View.OnFocusChangeListener() {
             @Override
             public void onFocusChange(View view, boolean b) {
@@ -87,7 +101,7 @@ public class LoginActivity extends BaseActivity {
                     }
                 }
             }
-        });
+        });*/
         //监测虚拟键盘登录
         et_password.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override
@@ -170,11 +184,74 @@ public class LoginActivity extends BaseActivity {
      * 获得数据
      */
     public void getData() {
+        boolean netWorkConnected = CommonUtils.isNetWorkConnected(this);
+        if (!netWorkConnected) {
+            Toast.makeText(this, R.string.network_isnot_available, Toast.LENGTH_SHORT).show();
+            return;
+        }
         String name = et_username.getText().toString();
         String pwd = et_password.getText().toString();
-        Log.e("====", "name=" + name + "=password=" + pwd);
-        //HttpUtils.getLoginData(name, pwd, this);
+        if (TextUtils.isEmpty(name)) {
+            Toast.makeText(this, R.string.User_name_cannot_be_empty, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (TextUtils.isEmpty(pwd)) {
+            Toast.makeText(this, R.string.Password_cannot_be_empty, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        progressShow = true;
+        final ProgressDialog pd = new ProgressDialog(LoginActivity.this);
+        pd.setCanceledOnTouchOutside(false);
+        pd.setOnCancelListener(new DialogInterface.OnCancelListener() {
+            @Override
+            public void onCancel(DialogInterface dialog) {
+                progressShow = false;
+            }
+        });
+        pd.setMessage(getString(R.string.is_landing));
+        pd.show();
+        OkHttpUtils.post()
+                .url(StoyInter.LOGIN)
+                .addParams("username",name)
+                .addParams("password",pwd)
+                .build()
+                .execute(new StringCallback() {
+                             @Override
+                             public void onError(Call call, Exception e, int id) {
+                                 if (!progressShow) {
+                                     return;
+                                 }
+                                 runOnUiThread(new Runnable() {
+                                     public void run() {
+                                         pd.dismiss();
+                                         Toast.makeText(getApplicationContext(), getString(R.string.Login_failed),
+                                                 Toast.LENGTH_SHORT).show();
+                                     }
+                                 });
+                             }
 
+                             @Override
+                             public void onResponse(String response, int id) {
+                                 if (response != null) {
+                                     LoginBean bean = new Gson().fromJson(response, LoginBean.class);
+                                     if (bean.getResult() == 1) {
+                                         if (!LoginActivity.this.isFinishing() && pd.isShowing())
+                                         {
+                                             pd.dismiss();
+                                         }
+                                         Toast.makeText(MyApplication.getContext(),bean.getMsg(),Toast.LENGTH_SHORT).show();
+                                         Intent intent = new Intent(LoginActivity.this,MainActivity.class);
+                                         startActivity(intent);
+                                         finish();
+                                     }else {
+                                         Toast.makeText(MyApplication.getContext(),R.string.login_failure,Toast.LENGTH_SHORT).show();
+                                     }
+                                 }else {
+                                     Toast.makeText(MyApplication.getContext(),R.string.login_failure,Toast.LENGTH_SHORT).show();
+                                 }
+                             }
+                         }
+                );
     }
 
 
